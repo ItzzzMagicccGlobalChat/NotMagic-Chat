@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NotMagic Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0015 0%, #1a0033 100%);
+            font-family: Arial, sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .sidebar {
+            width: 250px;
+            background: rgba(0, 0, 0, 0.7);
+            border-right: 3px solid #b000ff;
+            box-shadow: inset 0 0 20px #b000ff, 0 0 30px #b000ff;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .sidebar h2 {
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff, 0 0 20px #b000ff;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        .chat-list {
+            list-style: none;
+        }
+        
+        .chat-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            background: rgba(180, 0, 255, 0.1);
+            border: 1px solid #b000ff;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(180, 0, 255, 0.3);
+        }
+        
+        .chat-item:hover {
+            background: rgba(180, 0, 255, 0.3);
+            box-shadow: 0 0 20px #b000ff;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: linear-gradient(90deg, rgba(180, 0, 255, 0.2), rgba(0, 0, 0, 0.8));
+            border-bottom: 3px solid #ff00ff;
+            padding: 15px 20px;
+            box-shadow: 0 0 30px #ff00ff;
+        }
+        
+        .header h1 {
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #ff00ff;
+            font-size: 24px;
+        }
+        
+        .rank-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #ff00ff, #b000ff);
+            padding: 5px 15px;
+            border-radius: 20px;
+            margin-left: 10px;
+            font-size: 12px;
+            box-shadow: 0 0 15px #ff00ff;
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .message {
+            background: rgba(180, 0, 255, 0.1);
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 4px solid #b000ff;
+            box-shadow: 0 0 15px rgba(180, 0, 255, 0.3), inset 0 0 10px rgba(255, 0, 255, 0.1);
+            transition: all 0.3s;
+        }
+        
+        .message:hover {
+            box-shadow: 0 0 25px #b000ff, inset 0 0 15px rgba(255, 0, 255, 0.2);
+            transform: translateX(5px);
+        }
+        
+        .message-author {
+            color: #00ffff;
+            font-weight: bold;
+            text-shadow: 0 0 5px #00ffff;
+            font-size: 14px;
+        }
+        
+        .message-rank {
+            display: inline-block;
+            background: #b000ff;
+            color: #00ffff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-left: 8px;
+            box-shadow: 0 0 10px #b000ff;
+        }
+        
+        .message-content {
+            color: #fff;
+            margin-top: 5px;
+            word-wrap: break-word;
+        }
+        
+        .message-image {
+            max-width: 200px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: 2px solid #b000ff;
+            box-shadow: 0 0 15px #b000ff;
+        }
+        
+        .input-area {
+            background: rgba(0, 0, 0, 0.8);
+            border-top: 3px solid #b000ff;
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+            box-shadow: inset 0 0 20px #b000ff;
+        }
+        
+        .input-group {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+        }
+        
+        input, textarea {
+            flex: 1;
+            background: rgba(180, 0, 255, 0.1);
+            border: 2px solid #b000ff;
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(180, 0, 255, 0.3);
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        input:focus, textarea:focus {
+            box-shadow: 0 0 25px #b000ff, inset 0 0 10px rgba(255, 0, 255, 0.1);
+            border-color: #ff00ff;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #b000ff, #ff00ff);
+            border: 2px solid #ff00ff;
+            color: #00ffff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 0 15px #ff00ff;
+            text-shadow: 0 0 5px #ff00ff;
+        }
+        
+        button:hover {
+            box-shadow: 0 0 30px #ff00ff, inset 0 0 10px #ff00ff;
+            transform: scale(1.05);
+        }
+        
+        button:active {
+            transform: scale(0.95);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .menu-btn {
+            background: linear-gradient(135deg, #b000ff, #ff00ff);
+            border: none;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 3px;
+            box-shadow: 0 0 10px #ff00ff;
+        }
+        
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            min-width: 150px;
+            box-shadow: 0 0 20px #b000ff;
+            border: 2px solid #b000ff;
+            z-index: 1;
+            border-radius: 5px;
+        }
+        
+        .dropdown-content a {
+            color: #00ffff;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-bottom: 1px solid rgba(180, 0, 255, 0.2);
+        }
+        
+        .dropdown-content a:hover {
+            background: rgba(180, 0, 255, 0.3);
+            color: #ff00ff;
+            box-shadow: inset 0 0 10px #b000ff;
+        }
+        
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #0a0015, #1a0033);
+            margin: 5% auto;
+            padding: 20px;
+            border: 3px solid #b000ff;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 0 40px #b000ff;
+        }
+        
+        .close {
+            color: #ff00ff;
+            float: right;
+            font-size: 28px;
+            cursor: pointer;
+            text-shadow: 0 0 5px #ff00ff;
+        }
+        
+        .close:hover {
+            color: #00ffff;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: rgba(180, 0, 255, 0.1);
+            border: 2px solid #b000ff;
+            color: #00ffff;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn.active {
+            background: rgba(180, 0, 255, 0.4);
+            box-shadow: 0 0 20px #b000ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <h2>💬 CHANNELS</h2>
+            <ul class="chat-list">
+                <li class="chat-item">Global Chat</li>
+                <li class="chat-item">Announcements</li>
+                <li class="chat-item">General</li>
+            </ul>
+            
+            <h2 style="margin-top: 30px;">👥 DIRECT MESSAGES</h2>
+            <ul class="chat-list" id="dmList">
+                <li class="chat-item">+ New DM</li>
+            </ul>
+            
+            <h2 style="margin-top: 30px;">⚙️ OPTIONS</h2>
+            <div class="dropdown">
+                <button class="menu-btn">Menu</button>
+                <div class="dropdown-content">
+                    <a onclick="openSettings()">Settings</a>
+                    <a onclick="openModPanel()">Moderation</a>
+                    <a onclick="logout()">Logout</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <div class="header">
+                <h1>NotMagic Chat 
+                    <span class="rank-badge" id="userRank">👑 Owner</span>
+                </h1>
+            </div>
+
+            <!-- Messages Area -->
+            <div class="messages" id="messagesContainer">
+                <div class="message">
+                    <div class="message-author">
+                        🤖 NotMagic Bot
+                        <span class="message-rank">SYSTEM</span>
+                    </div>
+                    <div class="message-content">Welcome to NotMagic Chat! This is a global chat platform with auto-moderation enabled. Be respectful to others! ✨</div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div class="input-group">
+                    <input type="text" id="messageInput" placeholder="Type your message...">
+                    <button onclick="uploadImage()">📸</button>
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Moderation Modal -->
+    <div id="modModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModPanel()">&times;</span>
+            <h2 style="color: #ff00ff; text-shadow: 0 0 10px #ff00ff;">Moderation Panel</h2>
+            <div style="margin-top: 20px;">
+                <input type="text" placeholder="Username to moderate..." id="modUsername" style="width: 100%; margin-bottom: 10px;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="banUser()">Ban User</button>
+                    <button onclick="timeoutUser()">Timeout (1h)</button>
+                    <button onclick="warnUser()">Warn User</button>
+                </div>
+                <div style="margin-top: 15px;">
+                    <h3 style="color: #00ffff;">Give Rank</h3>
+                    <select id="rankSelect" style="width: 100%; padding: 8px; margin: 10px 0; background: rgba(180, 0, 255, 0.1); border: 2px solid #b000ff; color: #fff; border-radius: 3px;">
+                        <option>Mod</option>
+                        <option>Admin</option>
+                        <option>Co-Owner</option>
+                        <option>Head Admin</option>
+                    </select>
+                    <button onclick="giveRank()" style="width: 100%;">Give Rank</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeSettings()">&times;</span>
+            <h2 style="color: #ff00ff; text-shadow: 0 0 10px #ff00ff;">Settings</h2>
+            <div style="margin-top: 20px;">
+                <label style="color: #00ffff;">
+                    <input type="checkbox" checked> Enable Notifications
+                </label>
+                <br><br>
+                <label style="color: #00ffff;">
+                    <input type="checkbox" checked> Show Images
+                </label>
+                <br><br>
+                <label style="color: #00ffff;">
+                    <input type="checkbox" checked> Auto-moderation Enabled
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="imageInput" class="file-input" accept="image/*" onchange="handleImageSelect(event)">
+
+    <script>
+        let userRank = 'Owner';
+        let isModerator = true;
+        let bannedWords = ['badword1', 'badword2', 'inappropriate', 'spam', 'nsfw'];
+        let messageHistory = [];
+
+        document.getElementById('userRank').textContent = '👑 ' + userRank;
+
+        function sanitizeMessage(text) {
+            let sanitized = text;
+            for (let word of bannedWords) {
+                const regex = new RegExp(word, 'gi');
+                sanitized = sanitized.replace(regex, '***');
+            }
+            return sanitized;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+
+            if (text === '') return;
+
+            const sanitized = sanitizeMessage(text);
+            const message = {
+                author: 'You',
+                rank: userRank,
+                content: sanitized,
+                timestamp: new Date().toLocaleTimeString()
+            };
+
+            addMessageToChat(message);
+            input.value = '';
+            messageHistory.push(message);
+        }
+
+        function addMessageToChat(message) {
+            const container = document.getElementById('messagesContainer');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message';
+            msgDiv.innerHTML = `
+                <div class="message-author">
+                    ${message.author}
+                    <span class="message-rank">${message.rank}</span>
+                    <small style="color: #999; margin-left: 10px;">${message.timestamp}</small>
+                </div>
+                <div class="message-content">${message.content}</div>
+                ${message.image ? `<img src="${message.image}" class="message-image">` : ''}
+            `;
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        document.getElementById('messageInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function uploadImage() {
+            document.getElementById('imageInput').click();
+        }
+
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const message = {
+                        author: 'You',
+                        rank: userRank,
+                        content: '[Image Shared]',
+                        image: e.target.result,
+                        timestamp: new Date().toLocaleTimeString()
+                    };
+                    addMessageToChat(message);
+                    messageHistory.push(message);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function openModPanel() {
+            if (isModerator) {
+                document.getElementById('modModal').style.display = 'block';
+            } else {
+                alert('You do not have permission to access the moderation panel.');
+            }
+        }
+
+        function closeModPanel() {
+            document.getElementById('modModal').style.display = 'none';
+        }
+
+        function banUser() {
+            const username = document.getElementById('modUsername').value;
+            if (username) {
+                const message = {
+                    author: '🤖 NotMagic Bot',
+                    rank: 'SYSTEM',
+                    content: `${username} has been banned from the chat.`,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+                addMessageToChat(message);
+                document.getElementById('modUsername').value = '';
+            }
+        }
+
+        function timeoutUser() {
+            const username = document.getElementById('modUsername').value;
+            if (username) {
+                const message = {
+                    author: '🤖 NotMagic Bot',
+                    rank: 'SYSTEM',
+                    content: `${username} has been timed out for 1 hour.`,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+                addMessageToChat(message);
+                document.getElementById('modUsername').value = '';
+            }
+        }
+
+        function warnUser() {
+            const username = document.getElementById('modUsername').value;
+            if (username) {
+                const message = {
+                    author: '🤖 NotMagic Bot',
+                    rank: 'SYSTEM',
+                    content: `${username} has been warned.`,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+                addMessageToChat(message);
+                document.getElementById('modUsername').value = '';
+            }
+        }
+
+        function giveRank() {
+            const username = document.getElementById('modUsername').value;
+            const rank = document.getElementById('rankSelect').value;
+            if (username) {
+                const message = {
+                    author: '🤖 NotMagic Bot',
+                    rank: 'SYSTEM',
+                    content: `${username} has been promoted to ${rank}.`,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+                addMessageToChat(message);
+                document.getElementById('modUsername').value = '';
+            }
+        }
+
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'block';
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function logout() {
+            alert('Logged out successfully!');
+            window.location.reload();
+        }
+
+        window.onclick = function(event) {
+            const modModal = document.getElementById('modModal');
+            const settingsModal = document.getElementById('settingsModal');
+            if (event.target == modModal) {
+                modModal.style.display = 'none';
+            }
+            if (event.target == settingsModal) {
+                settingsModal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
