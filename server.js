@@ -12,16 +12,19 @@ const io = new Server(server, {
     }
 });
 
-app.use(express.static('public'));
+// Serve static files from public folder
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Banned words for auto-moderation
-const bannedWords = ['badword1', 'badword2', 'inappropriate', 'spam', 'nsfw'];
-const users = new Map(); // Store user info
+const bannedWords = ['badword1', 'badword2', 'inappropriate', 'spam', 'nsfw', 'explicit'];
+const users = new Map();
 const bannedUsers = new Set();
 const timedOutUsers = new Map();
+const userWarnings = new Map();
 
 // Sanitize messages
 function sanitizeMessage(text) {
+    if (!text) return '';
     let sanitized = text;
     for (let word of bannedWords) {
         const regex = new RegExp(word, 'gi');
@@ -36,16 +39,19 @@ io.on('connection', (socket) => {
 
     // User joins chat
     socket.on('user_join', (username) => {
+        // Check if user is banned
         if (bannedUsers.has(username)) {
-            socket.emit('error_message', 'You are banned from this chat.');
+            socket.emit('error_message', '🚫 You are banned from this chat.');
             socket.disconnect();
             return;
         }
 
+        // Store user info
         users.set(socket.id, {
             username: username,
             rank: 'User',
-            socketId: socket.id
+            socketId: socket.id,
+            warnings: userWarnings.get(username) || 0
         });
 
         // Broadcast user joined
@@ -65,9 +71,22 @@ io.on('connection', (socket) => {
         const user = users.get(socket.id);
         if (!user) return;
 
+        // Check if user is banned
+        if (bannedUsers.has(user.username)) {
+            socket.emit('error_message', '🚫 You are banned');
+            return;
+        }
+
         // Check if user is timed out
         if (timedOutUsers.has(user.username)) {
-            socket.emit('error_message', 'You are timed out');
+            socket.emit('error_message', '⏱️ You are timed out');
+            return;
+        }
+
+        // Check warnings (3 warnings = auto-ban)
+        if (userWarnings.get(user.username) >= 3) {
+            bannedUsers.add(user.username);
+            socket.emit('error_message', '🚫 You have been banned (3 warnings)');
             return;
         }
 
@@ -79,7 +98,8 @@ io.on('connection', (socket) => {
             rank: user.rank,
             message: sanitized,
             timestamp: new Date().toLocaleTimeString(),
-            image: data.image || null
+            image: data.image || null,
+            channel: data.channel || 'global'
         });
 
         console.log(`💬 ${user.username}: ${sanitized}`);
@@ -90,7 +110,7 @@ io.on('connection', (socket) => {
         const sender = users.get(socket.id);
         if (!sender) return;
 
-        // Find recipient
+        // Find recipient socket
         let recipientSocket = null;
         for (let [socketId, user] of users) {
             if (user.username === data.recipient) {
@@ -102,16 +122,18 @@ io.on('connection', (socket) => {
         if (recipientSocket) {
             io.to(recipientSocket).emit('receive_dm', {
                 from: sender.username,
-                message: data.message,
+                message: sanitizeMessage(data.message),
                 timestamp: new Date().toLocaleTimeString()
             });
+            
             socket.emit('dm_sent', {
                 to: data.recipient,
                 message: data.message,
                 timestamp: new Date().toLocaleTimeString()
             });
+            console.log(`💌 DM from ${sender.username} to ${data.recipient}`);
         } else {
-            socket.emit('error_message', 'User not found');
+            socket.emit('error_message', '❌ User not found');
         }
     });
 
@@ -119,39 +141,91 @@ io.on('connection', (socket) => {
     socket.on('ban_user', (data) => {
         const moderator = users.get(socket.id);
         if (moderator.rank !== 'Owner') {
-            socket.emit('error_message', 'You do not have permission');
+            socket.emit('error_message', '❌ You do not have permission to ban users');
             return;
         }
 
         bannedUsers.add(data.username);
-        io.emit('system_message', `${data.username} has been banned`);
-        console.log(`🚫 ${data.username} banned`);
+        io.emit('system_message', `🚫 ${data.username} has been banned from the chat`);
+        
+        // Disconnect the banned user
+        for (let [socketId, user] of users) {
+            if (user.username === data.username) {
+                io.to(socketId).emit('error_message', '🚫 You have been banned');
+                break;
+            }
+        }
+        console.log(`🚫 ${data.username} banned by ${moderator.username}`);
     });
 
-    // Timeout user (Owner/Mod)
+    // Timeout user (Owner/Mod/Admin)
     socket.on('timeout_user', (data) => {
         const moderator = users.get(socket.id);
         if (!['Owner', 'Head Admin', 'Co-Owner', 'Admin', 'Mod'].includes(moderator.rank)) {
-            socket.emit('error_message', 'You do not have permission');
+            socket.emit('error_message', '❌ You do not have permission to timeout users');
             return;
         }
 
         timedOutUsers.set(data.username, true);
-        io.emit('system_message', `${data.username} has been timed out for 1 hour`);
+        io.emit('system_message', `⏱️ ${data.username} has been timed out for 1 hour`);
 
-        // Remove timeout after 1 hour
+        // Remove timeout after 1 hour (3600000 ms)
         setTimeout(() => {
             timedOutUsers.delete(data.username);
+            io.emit('system_message', `✅ ${data.username}'s timeout has expired`);
         }, 3600000);
 
-        console.log(`⏱️ ${data.username} timed out`);
+        console.log(`⏱️ ${data.username} timed out by ${moderator.username}`);
+    });
+
+    // Warn user
+    socket.on('warn_user', (data) => {
+        const moderator = users.get(socket.id);
+        if (!['Owner', 'Head Admin', 'Co-Owner', 'Admin', 'Mod'].includes(moderator.rank)) {
+            socket.emit('error_message', '❌ You do not have permission to warn users');
+            return;
+        }
+
+        const currentWarnings = userWarnings.get(data.username) || 0;
+        userWarnings.set(data.username, currentWarnings + 1);
+        
+        io.emit('system_message', `⚠️ ${data.username} has been warned (${currentWarnings + 1}/3)`);
+
+        // Auto-ban after 3 warnings
+        if (currentWarnings + 1 >= 3) {
+            bannedUsers.add(data.username);
+            io.emit('system_message', `🚫 ${data.username} has been banned (3 warnings)`);
+        }
+
+        console.log(`⚠️ ${data.username} warned by ${moderator.username}`);
+    });
+
+    // Kick user
+    socket.on('kick_user', (data) => {
+        const moderator = users.get(socket.id);
+        if (!['Owner', 'Head Admin', 'Co-Owner', 'Admin', 'Mod'].includes(moderator.rank)) {
+            socket.emit('error_message', '❌ You do not have permission to kick users');
+            return;
+        }
+
+        // Find and disconnect the user
+        for (let [socketId, user] of users) {
+            if (user.username === data.username) {
+                io.to(socketId).emit('error_message', '👢 You have been kicked from the chat');
+                io.sockets.sockets.get(socketId).disconnect();
+                break;
+            }
+        }
+
+        io.emit('system_message', `👢 ${data.username} has been kicked from the chat`);
+        console.log(`👢 ${data.username} kicked by ${moderator.username}`);
     });
 
     // Give rank
     socket.on('give_rank', (data) => {
         const moderator = users.get(socket.id);
         if (moderator.rank !== 'Owner') {
-            socket.emit('error_message', 'Only Owner can give ranks');
+            socket.emit('error_message', '❌ Only Owner can give ranks');
             return;
         }
 
@@ -159,33 +233,16 @@ io.on('connection', (socket) => {
         for (let [socketId, user] of users) {
             if (user.username === data.username) {
                 user.rank = data.rank;
+                
+                // Send notification to the promoted user
+                io.to(socketId).emit('system_message', `✨ You have been promoted to ${data.rank}`);
                 break;
             }
         }
 
-        io.emit('system_message', `${data.username} is now a ${data.rank}`);
+        io.emit('system_message', `✨ ${data.username} is now a ${data.rank}`);
         io.emit('users_list', Array.from(users.values()));
-        console.log(`⭐ ${data.username} promoted to ${data.rank}`);
-    });
-
-    // Warn user
-    socket.on('warn_user', (data) => {
-        const moderator = users.get(socket.id);
-        if (!['Owner', 'Head Admin', 'Co-Owner', 'Admin', 'Mod'].includes(moderator.rank)) {
-            return;
-        }
-
-        io.emit('system_message', `${data.username} has been warned`);
-    });
-
-    // Typing indicator
-    socket.on('user_typing', (data) => {
-        const user = users.get(socket.id);
-        if (user) {
-            socket.broadcast.emit('user_typing', {
-                username: user.username
-            });
-        }
+        console.log(`⭐ ${data.username} promoted to ${data.rank} by ${moderator.username}`);
     });
 
     // User disconnects
@@ -204,6 +261,9 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(3000, () => {
-    console.log('🚀 NotMagic Chat Server running on http://localhost:3000');
+// Start server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🚀 NotMagic Chat Server running on http://localhost:${PORT}`);
+    console.log(`✨ Server ready! Open browser to http://localhost:${PORT}`);
 });
